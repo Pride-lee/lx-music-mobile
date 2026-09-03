@@ -50,7 +50,10 @@ jobs:
       - name: Add upstream remote
         run: |
           git remote add upstream https://github.com/lyswhut/lx-music-mobile.git
-          git fetch upstream --tags
+          # 本 fork 的 Release workflow 会创建同版本标签；这些标签可能与上游
+          # 同名但指向不同提交。同步这里只需要分支，禁止抓取标签可避免
+          # "would clobber existing tag"，同时保留本仓库已有 Release 标签。
+          git fetch upstream --no-tags
 
       - name: Merge upstream branch
         env:
@@ -74,9 +77,7 @@ jobs:
 
       - name: Push merged commits
         if: env.CHANGED == 'true'
-        run: |
-          git push origin master
-          git push origin --tags
+        run: git push origin master
 
       - name: Trigger Release workflow
         if: env.CHANGED == 'true' && (github.event_name == 'schedule' || github.event.inputs.run_release == 'true')
