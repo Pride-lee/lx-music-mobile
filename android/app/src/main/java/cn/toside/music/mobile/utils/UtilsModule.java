@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageInfo;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.net.wifi.WifiInfo;
@@ -29,7 +30,9 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableNativeArray;
 
 import java.io.File;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 public class UtilsModule extends ReactContextBaseJavaModule {
@@ -49,6 +52,13 @@ public class UtilsModule extends ReactContextBaseJavaModule {
   @Override
   public String getName() {
     return "UtilsModule";
+  }
+
+  @Override
+  public Map<String, Object> getConstants() {
+    Map<String, Object> constants = new HashMap<>();
+    constants.put("packageName", reactContext.getPackageName());
+    return constants;
   }
 
   @ReactMethod
@@ -133,6 +143,12 @@ public class UtilsModule extends ReactContextBaseJavaModule {
       Log.e("Utils", "installApk: file doe snot exist '" + filePath + "'");
       // FIXME this should take a promise and fail it
       promise.reject("Utils", "installApk: file doe snot exist '" + filePath + "'");
+      return;
+    }
+
+    PackageInfo updatePackage = reactContext.getPackageManager().getPackageArchiveInfo(filePath, 0);
+    if (updatePackage == null || !reactContext.getPackageName().equals(updatePackage.packageName)) {
+      promise.reject("Utils", "Update APK package does not match the installed app");
       return;
     }
 

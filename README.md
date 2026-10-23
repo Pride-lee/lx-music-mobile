@@ -42,6 +42,21 @@ git merge upstream/master   # 或 git rebase upstream/master
 
 ### 自动同步上游 + 自动打包到 Release
 
+#### 小米后屏版的两个包名
+
+`xiaomi` 分支每次发版会同时构建两组 APK，历史 release 会继续保留：
+
+| 版本 | Android 包名 | Release 标签 | APK 文件后缀 |
+|------|-------------|--------------|-------------|
+| 汽水包名版 | `com.luna.music` | `v{版本}-xiaomi-luna` | `-xiaomi-luna.apk` |
+| 酷我包名版 | `cn.kuwo.player` | `v{版本}-xiaomi-kuwo` | `-xiaomi-kuwo.apk` |
+
+应用从实际安装包名选择通道，检查对应 release 是否已发布，只下载同一包名的更新；安装前还会再次校验 APK 包名。两个版本可以共存，设置和歌单相互独立，且分别与对应官方应用包名冲突。后屏兼容性需要设备实测。
+
+旧版 `v1.8.7-xiaomi` 使用汽水包名，`v1.9.1-xiaomi` 使用酷我包名，但两者写死了同一个更新地址。请手动下载对应包名的 `v1.9.2` 或更高版本覆盖安装一次，后续即可保持所安装的通道更新。同包名且签名一致时无需卸载；跨包名迁移请先备份再恢复。
+
+本地构建可以使用 `gradlew.bat assembleRelease -PlxReleaseChannel=luna` 或 `-PlxReleaseChannel=kuwo`。通道配置集中在 `release-channels.json`，主线默认构建 `standard`，仍使用 `cn.toside.music.mobile`。
+
 仓库已附带两个工作流，配合一次性配置即可让「同步上游」与「打包发版」全自动跑：
 
 - `.github/workflows/sync-upstream.yml`：每天 UTC 18:00（北京 02:00）自动 `merge upstream/master` 并推送，可在 Actions 页手动触发。

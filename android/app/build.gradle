@@ -101,6 +101,12 @@ def npmPackageJson = getNpmPackageJson()
 def verCode = npmPackageJson["versionCode"]
 def verName = npmPackageJson["version"]
 def applicationName = npmPackageJson["name"]
+def releaseChannels = new JsonSlurper().parse(rootProject.file("../release-channels.json"))
+def releaseChannelName = project.findProperty("lxReleaseChannel") ?: "standard"
+def releaseChannel = releaseChannels[releaseChannelName]
+if (releaseChannel == null) {
+    throw new GradleException("Unknown release channel: ${releaseChannelName}")
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -110,7 +116,7 @@ android {
 
     namespace "cn.toside.music.mobile"
     defaultConfig {
-        applicationId "cn.toside.music.mobile"
+        applicationId releaseChannel.applicationId
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode verCode

@@ -1,12 +1,19 @@
 import { httpGet } from '@/utils/request'
 import { name } from '../../package.json'
 import { downloadFile, stopDownload, temporaryDirectoryPath } from '@/utils/fs'
-import { getSupportedAbis, installApk } from '@/utils/nativeModules/utils'
+import { APP_PACKAGE_NAME, getSupportedAbis, installApk } from '@/utils/nativeModules/utils'
 import { APP_PROVIDER_NAME } from '@/config/constant'
+import releaseChannels from '../../release-channels.json'
 
 // fork：检查更新只看自己的仓库；GitHub 仓库 slug 仍保持 package.json 的 name（lx-music-mobile）
 const FORK_OWNER = 'Pride-lee'
 const FORK_REPO = name
+
+const getUpdateChannel = () => {
+  const channel = Object.values(releaseChannels).find(channel => channel.applicationId == APP_PACKAGE_NAME)
+  if (!channel) throw new Error(`Unsupported update package: ${APP_PACKAGE_NAME}`)
+  return channel
+}
 
 const abis = [
   'arm64-v8a',
@@ -16,12 +23,15 @@ const abis = [
   'universal',
 ]
 
-const address = [
-  [`https://raw.githubusercontent.com/${FORK_OWNER}/${FORK_REPO}/master/publish/version.json`, 'direct'],
-  [`https://cdn.jsdelivr.net/gh/${FORK_OWNER}/${FORK_REPO}/publish/version.json`, 'direct'],
-  [`https://fastly.jsdelivr.net/gh/${FORK_OWNER}/${FORK_REPO}/publish/version.json`, 'direct'],
-  [`https://gcore.jsdelivr.net/gh/${FORK_OWNER}/${FORK_REPO}/publish/version.json`, 'direct'],
-]
+const getVersionAddresses = () => {
+  const { updateBranch } = getUpdateChannel()
+  return [
+    [`https://raw.githubusercontent.com/${FORK_OWNER}/${FORK_REPO}/${updateBranch}/publish/version.json`, 'direct'],
+    [`https://cdn.jsdelivr.net/gh/${FORK_OWNER}/${FORK_REPO}@${updateBranch}/publish/version.json`, 'direct'],
+    [`https://fastly.jsdelivr.net/gh/${FORK_OWNER}/${FORK_REPO}@${updateBranch}/publish/version.json`, 'direct'],
+    [`https://gcore.jsdelivr.net/gh/${FORK_OWNER}/${FORK_REPO}@${updateBranch}/publish/version.json`, 'direct'],
+  ]
+}
 
 
 const request = async(url, retryNum = 0) => {
@@ -39,10 +49,18 @@ const request = async(url, retryNum = 0) => {
 }
 
 const getDirectInfo = async(url) => {
-  return request(url).then(info => {
-    if (info.version == null) throw new Error('failed')
-    return info
-  })
+  const info = await request(url)
+  if (info.version == null) throw new Error('failed')
+  const { releaseSuffix } = getUpdateChannel()
+  if (releaseSuffix) {
+    const tag = `v${info.version}${releaseSuffix}`
+    const release = await request(`https://api.github.com/repos/${FORK_OWNER}/${FORK_REPO}/releases/tags/${encodeURIComponent(tag)}`)
+    if (release.tag_name != tag || release.draft || release.prerelease || !Array.isArray(release.assets)) throw new Error('Update channel release is unavailable')
+    if (!abis.every(abi => release.assets.some(asset => asset.name == `${FORK_REPO}-v${info.version}-${abi}${releaseSuffix}.apk`))) {
+      throw new Error('Update channel APKs are unavailable')
+    }
+  }
+  return info
 }
 
 const getNpmPkgInfo = async(url) => {
@@ -55,6 +73,7 @@ const getNpmPkgInfo = async(url) => {
 }
 
 export const getVersionInfo = async(index = 0) => {
+  const address = getVersionAddresses()
   const [url, source] = address[index]
   let promise
   switch (source) {
@@ -85,9 +104,10 @@ const noop = (total, download) => {}
 let apkSavePath
 
 export const downloadNewVersion = async(version, onDownload = noop) => {
+  const { releaseSuffix } = getUpdateChannel()
   const abi = await getTargetAbi()
-  const url = `https://github.com/${FORK_OWNER}/${FORK_REPO}/releases/download/v${version}/${FORK_REPO}-v${version}-${abi}.apk`
-  let savePath = temporaryDirectoryPath + '/lx-music-mobile.apk'
+  const url = `https://github.com/${FORK_OWNER}/${FORK_REPO}/releases/download/v${version}${releaseSuffix}/${FORK_REPO}-v${version}-${abi}${releaseSuffix}.apk`
+  let savePath = `${temporaryDirectoryPath}/${APP_PACKAGE_NAME}-update.apk`
 
   if (downloadJobId) stopDownload(downloadJobId)
 

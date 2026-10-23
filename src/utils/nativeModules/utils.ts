@@ -2,6 +2,8 @@ import { AppState, NativeEventEmitter, NativeModules } from 'react-native'
 
 const { UtilsModule } = NativeModules
 
+export const APP_PACKAGE_NAME = UtilsModule.getConstants().packageName as string
+
 export const exitApp = UtilsModule.exitApp
 
 export const getSupportedAbis = UtilsModule.getSupportedAbis

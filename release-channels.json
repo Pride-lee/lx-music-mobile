@@ -1,0 +1,17 @@
+{
+  "standard": {
+    "applicationId": "cn.toside.music.mobile",
+    "updateBranch": "master",
+    "releaseSuffix": ""
+  },
+  "luna": {
+    "applicationId": "com.luna.music",
+    "updateBranch": "xiaomi",
+    "releaseSuffix": "-xiaomi-luna"
+  },
+  "kuwo": {
+    "applicationId": "cn.kuwo.player",
+    "updateBranch": "xiaomi",
+    "releaseSuffix": "-xiaomi-kuwo"
+  }
+}
