@@ -15,6 +15,7 @@ async function loadUpdater(applicationId, options = {}) {
   const downloads = []
   const installs = []
   const stoppedJobs = []
+  const availabilityChecks = []
   const channel = Object.values(channels).find(item => item.applicationId === applicationId)
   const metadata = { version, desc: 'Release notes', history: [] }
   const release = {
@@ -30,7 +31,9 @@ async function loadUpdater(applicationId, options = {}) {
       httpGet(url, config, callback) {
         requests.push(url)
         const isRelease = url.startsWith('https://api.github.com/')
-        if (isRelease && options.unpublished) {
+        if (isRelease && options.rateLimited) {
+          callback(null, { statusCode: options.rateLimited, statusMessage: 'Rate limit exceeded' }, {})
+        } else if (isRelease && options.unpublished) {
           callback(null, { statusCode: 404, statusMessage: 'Not Found' }, {})
         } else if (!isRelease && options.failPrimary && url.startsWith('https://raw.githubusercontent.com/')) {
           callback(new Error('Primary mirror unavailable'))
@@ -40,6 +43,10 @@ async function loadUpdater(applicationId, options = {}) {
         } else {
           callback(null, { statusCode: 200 }, isRelease ? release : metadata)
         }
+      },
+      async checkUrl(url) {
+        availabilityChecks.push(url)
+        if (options.headUnavailable) throw new Error('Channel APK is unavailable')
       },
     },
     '../../package.json': { name: repo },
@@ -71,7 +78,7 @@ async function loadUpdater(applicationId, options = {}) {
     }, { context })
   })
   await updater.evaluate()
-  return { api: updater.namespace, requests, downloads, installs, stoppedJobs }
+  return { api: updater.namespace, requests, downloads, installs, stoppedJobs, availabilityChecks }
 }
 
 for (const [name, channel] of Object.entries(channels)) {
@@ -159,6 +166,25 @@ for (const name of ['luna', 'kuwo']) {
     assert.ok(updater.requests.some(url => url.includes('@xiaomi/publish/version.json')))
     assert.ok(updater.requests.every(url => !url.includes(other.releaseSuffix)))
     assert.ok(updater.requests.filter(url => url.startsWith('https://api.github.com/')).every(url => url.endsWith(channel.releaseSuffix)))
+  })
+
+  for (const status of [403, 429]) {
+    test(`${name}: API limit ${status} checks only the same channel's APK`, async() => {
+      const updater = await loadUpdater(channel.applicationId, { rateLimited: status })
+      assert.equal((await updater.api.getVersionInfo()).version, version)
+      assert.deepEqual(updater.availabilityChecks, [
+        `https://github.com/Pride-lee/${repo}/releases/download/v${version}${channel.releaseSuffix}/${repo}-v${version}-arm64-v8a${channel.releaseSuffix}.apk`,
+      ])
+      assert.equal(updater.requests.filter(url => url.startsWith('https://api.github.com/')).length, 1)
+    })
+  }
+
+  test(`${name}: an API limit and missing APK never switch to another channel`, async() => {
+    const updater = await loadUpdater(channel.applicationId, { rateLimited: 403, headUnavailable: true })
+    await assert.rejects(updater.api.getVersionInfo(), /Channel APK is unavailable/)
+    assert.ok(updater.availabilityChecks.length > 0)
+    assert.ok(updater.availabilityChecks.every(url => url.endsWith(`${channel.releaseSuffix}.apk`)))
+    assert.ok(updater.requests.every(url => !url.includes(other.releaseSuffix)))
   })
 }
 

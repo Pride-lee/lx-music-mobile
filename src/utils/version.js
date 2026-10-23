@@ -1,4 +1,4 @@
-import { httpGet } from '@/utils/request'
+import { checkUrl, httpGet } from '@/utils/request'
 import { name } from '../../package.json'
 import { downloadFile, stopDownload, temporaryDirectoryPath } from '@/utils/fs'
 import { APP_PACKAGE_NAME, getSupportedAbis, installApk } from '@/utils/nativeModules/utils'
@@ -13,6 +13,10 @@ const getUpdateChannel = () => {
   const channel = Object.values(releaseChannels).find(channel => channel.applicationId == APP_PACKAGE_NAME)
   if (!channel) throw new Error(`Unsupported update package: ${APP_PACKAGE_NAME}`)
   return channel
+}
+
+const getApkDownloadUrl = (version, abi, releaseSuffix) => {
+  return `https://github.com/${FORK_OWNER}/${FORK_REPO}/releases/download/v${version}${releaseSuffix}/${FORK_REPO}-v${version}-${abi}${releaseSuffix}.apk`
 }
 
 const abis = [
@@ -40,8 +44,13 @@ const request = async(url, retryNum = 0) => {
       timeout: 10000,
     }, (err, resp, body) => {
       if (err || resp.statusCode != 200) {
+        const error = err || Object.assign(new Error(resp.statusMessage || resp.statusCode), { statusCode: resp.statusCode })
+        if (error.statusCode == 403 || error.statusCode == 429) {
+          reject(error)
+          return
+        }
         ++retryNum >= 3
-          ? reject(err || new Error(resp.statusMessage || resp.statusCode))
+          ? reject(error)
           : request(url, retryNum).then(resolve).catch(reject)
       } else resolve(body)
     })
@@ -54,7 +63,16 @@ const getDirectInfo = async(url) => {
   const { releaseSuffix } = getUpdateChannel()
   if (releaseSuffix) {
     const tag = `v${info.version}${releaseSuffix}`
-    const release = await request(`https://api.github.com/repos/${FORK_OWNER}/${FORK_REPO}/releases/tags/${encodeURIComponent(tag)}`)
+    let release
+    try {
+      release = await request(`https://api.github.com/repos/${FORK_OWNER}/${FORK_REPO}/releases/tags/${encodeURIComponent(tag)}`)
+    } catch (error) {
+      if (error.statusCode != 403 && error.statusCode != 429) throw error
+      // Shared proxy IPs can exhaust the unauthenticated GitHub API quota.
+      const abi = await getTargetAbi()
+      await checkUrl(getApkDownloadUrl(info.version, abi, releaseSuffix), { timeout: 10000 })
+      return info
+    }
     if (release.tag_name != tag || release.draft || release.prerelease || !Array.isArray(release.assets)) throw new Error('Update channel release is unavailable')
     if (!abis.every(abi => release.assets.some(asset => asset.name == `${FORK_REPO}-v${info.version}-${abi}${releaseSuffix}.apk`))) {
       throw new Error('Update channel APKs are unavailable')
@@ -106,7 +124,7 @@ let apkSavePath
 export const downloadNewVersion = async(version, onDownload = noop) => {
   const { releaseSuffix } = getUpdateChannel()
   const abi = await getTargetAbi()
-  const url = `https://github.com/${FORK_OWNER}/${FORK_REPO}/releases/download/v${version}${releaseSuffix}/${FORK_REPO}-v${version}-${abi}${releaseSuffix}.apk`
+  const url = getApkDownloadUrl(version, abi, releaseSuffix)
   let savePath = `${temporaryDirectoryPath}/${APP_PACKAGE_NAME}-update.apk`
 
   if (downloadJobId) stopDownload(downloadJobId)
