@@ -6,6 +6,17 @@ Project versioning adheres to [Semantic Versioning](http://semver.org/).
 Commit convention is based on [Conventional Commits](http://conventionalcommits.org).
 Change log format is based on [Keep a Changelog](http://keepachangelog.com/).
 
+## [1.9.2](https://github.com/Pride-lee/lx-music-mobile/compare/v1.9.1...v1.9.2) - 2026-10-23
+
+### 新增
+
+- 小米后屏版同时提供汽水包名和酷我包名两个独立 release，历史版本继续保留。
+- 按实际安装包名固定更新通道，安装更新前校验 APK 包名，Provider 跟随安装身份。
+
+### 升级说明
+
+- 从旧版升级时，首次请手动下载对应包名的 v1.9.2 覆盖安装；之后自动保持当前通道。
+
 ## [1.9.1](https://github.com/lyswhut/lx-music-mobile/compare/v1.9.0...v1.9.1) - 2026-09-19
 
 ### 优化

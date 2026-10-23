@@ -101,6 +101,12 @@ def npmPackageJson = getNpmPackageJson()
 def verCode = npmPackageJson["versionCode"]
 def verName = npmPackageJson["version"]
 def applicationName = npmPackageJson["name"]
+def releaseChannels = new JsonSlurper().parse(rootProject.file("../release-channels.json"))
+def releaseChannelName = project.findProperty("lxReleaseChannel") ?: "kuwo"
+def releaseChannel = releaseChannels[releaseChannelName]
+if (releaseChannel == null) {
+    throw new GradleException("Unknown release channel: ${releaseChannelName}")
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -108,11 +114,10 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    // Keep the Java namespace stable; only the installed identity uses Kuwo's ID.
-    // This conflicts with official Kuwo and does not migrate older app data.
+    // Keep the Java namespace stable across installed package identities.
     namespace "cn.toside.music.mobile"
     defaultConfig {
-        applicationId "cn.kuwo.player"
+        applicationId releaseChannel.applicationId
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode verCode

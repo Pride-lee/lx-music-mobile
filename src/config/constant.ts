@@ -1,3 +1,5 @@
+import { APP_PACKAGE_NAME } from '@/utils/nativeModules/utils'
+
 export const HEADER_HEIGHT = 42
 export const LIST_ITEM_HEIGHT = 54
 export const LIST_SCROLL_POSITION_KEY = '__LIST_SCROLL_POSITION_KEY__'
@@ -95,7 +97,7 @@ export const storageDataPrefixOld = {
   notificationTipEnable: '@notification_tip_enable',
 } as const
 
-export const APP_PROVIDER_NAME = 'cn.kuwo.player.provider'
+export const APP_PROVIDER_NAME = `${APP_PACKAGE_NAME}.provider`
 
 
 export const NAV_MENUS = [

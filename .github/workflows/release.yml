@@ -23,6 +23,9 @@ jobs:
       - name: Setup Env
         uses: ./.github/actions/setup
 
+      - name: Test release channels
+        run: npm run test:release-channels
+
       - name: Build Packages
         env:
           DISABLE_SVG: 1
@@ -35,8 +38,14 @@ jobs:
         run: |
           cd android
           echo "$KEYSTORE_STORE_FILE_BASE64" | base64 --decode > "app/$KEYSTORE_STORE_FILE"
-          ./gradlew assembleRelease -PMYAPP_UPLOAD_STORE_FILE="$KEYSTORE_STORE_FILE" -PMYAPP_UPLOAD_KEY_ALIAS="$KEYSTORE_KEY_ALIAS" -PMYAPP_UPLOAD_STORE_PASSWORD="$KEYSTORE_PASSWORD" -PMYAPP_UPLOAD_KEY_PASSWORD="$KEYSTORE_KEY_PASSWORD"
+          ./gradlew assembleRelease -PlxReleaseChannel=standard -PMYAPP_UPLOAD_STORE_FILE="$KEYSTORE_STORE_FILE" -PMYAPP_UPLOAD_KEY_ALIAS="$KEYSTORE_KEY_ALIAS" -PMYAPP_UPLOAD_STORE_PASSWORD="$KEYSTORE_PASSWORD" -PMYAPP_UPLOAD_KEY_PASSWORD="$KEYSTORE_KEY_PASSWORD"
           rm -f "app/$KEYSTORE_STORE_FILE"
+
+      - name: Verify standard package identity
+        shell: bash
+        run: |
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)
+          node scripts/release-channel.cjs verify standard "$AAPT"
 
       # Push tag to GitHub if package.json version's tag is not tagged
       - name: Get package version
