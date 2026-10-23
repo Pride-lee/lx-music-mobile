@@ -6,8 +6,8 @@ name: Build (Xiaomi)
 #   - tag / release 名形如 v{version}-xiaomi
 #
 # 与主线版本的区别：
-#   - applicationId 为 com.luna.music（伪装"汽水音乐"，用于绕过小米/MIUI 后屏白名单）
-#   - 与汽水音乐互斥；从主线版本升级需卸载重装
+#   - applicationId 为 cn.kuwo.player（使用酷我音乐包名，供小米后屏兼容性测试）
+#   - 与官方酷我音乐互斥；旧包名版本需先备份数据，再安装并恢复
 #
 # 注意：本文件同时存在于 master 与 xiaomi 分支，但 trigger 只对 xiaomi 分支的 push 生效，
 #       master 上保留只是为了让 sync-master-to-xiaomi 流程可以一并同步过去。
@@ -43,6 +43,24 @@ jobs:
           echo ${{ secrets.KEYSTORE_STORE_FILE_BASE64 }} | base64 --decode > app/${{ secrets.KEYSTORE_STORE_FILE }}
           ./gradlew assembleRelease -PMYAPP_UPLOAD_STORE_FILE='${{ secrets.KEYSTORE_STORE_FILE }}' -PMYAPP_UPLOAD_KEY_ALIAS='${{ secrets.KEYSTORE_KEY_ALIAS }}' -PMYAPP_UPLOAD_STORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}' -PMYAPP_UPLOAD_KEY_PASSWORD='${{ secrets.KEYSTORE_KEY_PASSWORD }}'
           rm -f app/${{ secrets.KEYSTORE_STORE_FILE }}
+
+      - name: Verify release package identity
+        shell: bash
+        run: |
+          node <<'NODE'
+          const assert = require('node:assert/strict')
+          const fs = require('node:fs')
+          const metadata = JSON.parse(fs.readFileSync('android/app/build/outputs/apk/release/output-metadata.json', 'utf8'))
+          const pkg = require('./package.json')
+          assert.equal(metadata.applicationId, 'cn.kuwo.player')
+          assert.equal(metadata.elements.length, 5)
+          for (const apk of metadata.elements) {
+            assert.equal(apk.versionName, pkg.version)
+            assert.ok(fs.existsSync(`android/app/build/outputs/apk/release/${apk.outputFile}`))
+          }
+          assert.match(fs.readFileSync('src/config/constant.ts', 'utf8'), /APP_PROVIDER_NAME = 'cn\.kuwo\.player\.provider'/)
+          console.log(`Verified ${metadata.applicationId} v${pkg.version}: ${metadata.elements.length} APKs`)
+          NODE
 
       - name: Get package version
         run: |
@@ -114,8 +132,10 @@ jobs:
           # LHX Music v${PACKAGE_VERSION} (小米后屏版)
 
           本版本与 master 主线差异：
-          - \`applicationId\` 改为 \`com.luna.music\`，伪装汽水音乐以绕过小米/MIUI 后屏白名单
-          - 与汽水音乐互斥；从主线版本（cn.toside.music.mobile）升级需要先卸载再重装
+          - 同步上游 v${PACKAGE_VERSION}，保留本仓库的下载功能
+          - \`applicationId\` 改为 \`cn.kuwo.player\`，使用酷我音乐包名进行小米后屏兼容性测试，实际效果以设备为准
+          - 与官方酷我音乐互斥，无法覆盖安装官方应用
+          - 与旧小米版（com.luna.music）及主线版（cn.toside.music.mobile）是不同应用，数据不会自动迁移；请先备份，安装后恢复
 
           ## File MD5
           \`\`\`
