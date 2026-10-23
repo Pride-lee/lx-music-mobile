@@ -50,7 +50,7 @@ jobs:
           git fetch origin master
           BEFORE=$(git rev-parse HEAD)
           if ! git merge --no-edit origin/master; then
-            echo "::error::合并 master 出现冲突，请本地解决后再推送（通常是 build.gradle 或 constant.ts，留 xiaomi 那侧的 com.luna.music 即可）"
+            echo "::error::合并 master 出现冲突，请本地解决后再推送（通常是 build.gradle 或 constant.ts，保留 xiaomi 分支的 applicationId 和 provider 即可）"
             git merge --abort || true
             exit 1
           fi
