@@ -4,6 +4,7 @@ import { onDesktopLyricPositionChange, showDesktopLyric, onLyricLinePlay, showRe
 import playerState from '@/store/player/state'
 import { updateNowPlayingTitles } from '@/plugins/player/utils'
 import { setLastLyric } from '@/core/player/playInfo'
+import { initCarLyric } from '@/plugins/player/carLyric'
 
 const updateRemoteLyric = async(lrc?: string) => {
   setLastLyric(lrc)
@@ -24,6 +25,7 @@ const updateRemoteLyric = async(lrc?: string) => {
 
 export default async(setting: LX.AppSetting) => {
   await initLyricPlayer()
+  initCarLyric()
   await Promise.all([
     setPlaybackRate(setting['player.playbackRate']),
     toggleTranslation(setting['player.isShowLyricTranslation']),

@@ -6,6 +6,23 @@ Project versioning adheres to [Semantic Versioning](http://semver.org/).
 Commit convention is based on [Conventional Commits](http://conventionalcommits.org).
 Change log format is based on [Keep a Changelog](http://keepachangelog.com/).
 
+## [1.9.3](https://github.com/Pride-lee/lx-music-mobile/compare/v1.9.2-xiaomi-kuwo...v1.9.3-xiaomi-kuwo) - 2026-10-27
+
+### 新增
+
+- 播放设置新增「显示 CarWith / Jovi InCar 歌词」开关，默认关闭。
+- 接入车载逐行歌词、完整 LRC 和播放后延迟补发。
+
+### 修复
+
+- 关闭开关、停止播放或切歌时清理车载歌词，避免上一首歌词残留。
+- 媒体信息和封面更新时保留车载歌词，蓝牙歌词与车载歌词可分别控制。
+
+### 升级说明
+
+- 汽水和酷我包名继续分别发布，更新保持当前包名，历史 release 保留。
+- 车载歌词兼容性以设备实测为准。
+
 ## [1.9.2](https://github.com/Pride-lee/lx-music-mobile/compare/v1.9.1...v1.9.2) - 2026-10-23
 
 ### 新增

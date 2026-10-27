@@ -200,6 +200,7 @@ declare global {
        * 是否启用蓝牙完整歌词
        */
       'player.isShowBluetoothFullLyric': boolean
+      'player.isShowCarwithLyric': boolean
 
       /**
        * 播放详情页-是否缩放当前播放的歌词行

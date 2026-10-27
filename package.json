@@ -1,9 +1,12 @@
 {
   "name": "lx-music-mobile",
-  "version": "1.9.2",
-  "versionCode": 81,
+  "version": "1.9.3",
+  "versionCode": 82,
   "private": true,
   "scripts": {
+    "postinstall": "node dependencies-patch.js",
+    "test:car-lyrics": "node --test test/car-lyrics.test.cjs test/car-lyrics-patch.test.cjs",
+    "test:car-lyrics-native": "node --test test/car-lyrics-native.test.cjs",
     "test:release-channels": "node --experimental-vm-modules --test test/version-channels.test.cjs",
     "dev": "react-native run-android --active-arch-only",
     "ios": "react-native run-ios",

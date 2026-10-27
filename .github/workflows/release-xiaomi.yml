@@ -123,6 +123,8 @@ jobs:
           cat > release-notes.md <<EOF
           # LHX Music v${PACKAGE_VERSION} (小米后屏版 / ${{ matrix.label }})
 
+          - 播放设置新增「显示 CarWith / Jovi InCar 歌词」，默认关闭，接入逐行和完整歌词
+          - 补齐播放后延迟补发、关闭开关和切歌时的歌词清理，兼容性以设备实测为准
           - 安装包名：\`${{ env.APPLICATION_ID }}\`
           - 独立更新通道：\`${{ env.RELEASE_SUFFIX }}\`，安装后只检查和下载本包名的 release
           - 汽水包名与酷我包名两个版本会同时保留，可分别安装，数据相互独立

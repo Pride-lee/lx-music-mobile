@@ -381,6 +381,7 @@
   "setting_play_save_play_time": "记住播放进度",
   "setting_play_show_bluetooth_full_lyric": "显示完整蓝牙歌词（需设备支持）",
   "setting_play_show_bluetooth_lyric": "显示蓝牙歌词",
+  "setting_play_show_carwith_lyric": "显示 CarWith / Jovi InCar 歌词",
   "setting_play_show_notification_image": "在通知栏显示歌曲专辑封面图片",
   "setting_play_show_roma": "显示歌词罗马音（如果可用）",
   "setting_play_show_translation": "显示歌词翻译（如果可用）",

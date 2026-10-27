@@ -34,3 +34,11 @@ runs:
     - name: Install dependencies
       shell: bash
       run: npm ci
+
+    - name: Test car lyrics
+      shell: bash
+      run: npm run test:car-lyrics
+
+    - name: Test native car lyric metadata
+      shell: bash
+      run: npm run test:car-lyrics-native
