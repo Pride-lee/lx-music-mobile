@@ -69,7 +69,7 @@ function patchSource(source, patch) {
     if (result.includes(after)) continue
     const index = result.indexOf(before)
     if (index < 0 || result.indexOf(before, index + before.length) !== -1) {
-      throw new Error(`Car lyric patch does not match ${patch.file}; check the pinned track-player revision`)
+      throw new Error(`Dependency patch does not match ${patch.file}; check the pinned dependency revision`)
     }
     result = result.replace(before, after)
   }

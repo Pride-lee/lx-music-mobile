@@ -1,18 +1,18 @@
 import { useMemo, useState, useEffect, memo } from 'react'
-import { View, ScrollView } from 'react-native'
+import { View, ScrollView, Linking } from 'react-native'
 
 import { compareVer, sizeFormate } from '@/utils'
 
 import Button from '@/components/common/Button'
-import { updateApp } from '@/utils/version'
-import { createStyle } from '@/utils/tools'
+import { getReleasePageUrl } from '@/utils/version'
+import { createStyle, toast } from '@/utils/tools'
 import { useTheme } from '@/store/theme/hook'
 import { type VersionInfo } from '@/store/version/state'
 import Text from '@/components/common/Text'
 import { useI18n } from '@/lang'
 import { useVersionDownloadProgressUpdated, useVersionInfo, useVersionInfoIgnoreVersionUpdated } from '@/store/version/hook'
 import ModalContent from './ModalContent'
-import { checkUpdate, downloadUpdate, hideModal, setIgnoreVersion } from '@/core/version'
+import { checkUpdate, downloadUpdate, hideModal, setIgnoreVersion, installUpdate } from '@/core/version'
 
 const VersionItem = ({ version, desc }: VersionInfo) => {
   return (
@@ -116,7 +116,7 @@ const VersionModal = ({ componentId }: { componentId: string }) => {
           break
         case 'downloaded':
           setTitle(t('version_title_update'))
-          setTip('')
+          setTip(versionInfo.errorMessage ? `${t('version_tip_install_failed')}\n${versionInfo.errorMessage}` : '')
           if (ignoreBtnConfig.show) ignoreBtnConfig.show = false
           setConfirmBtn({ text: t('version_btn_update'), show: true, disabled: false })
           setCloseBtnText(t('version_btn_close'))
@@ -130,7 +130,7 @@ const VersionModal = ({ componentId }: { componentId: string }) => {
           break
         case 'error':
           setTitle(t('version_title_failed'))
-          setTip(t('version_tip_failed'))
+          setTip([t('version_tip_failed'), versionInfo.errorMessage].filter(Boolean).join('\n'))
           ignoreBtnConfig.show = true
           ignoreBtnConfig.disabled = false
           setConfirmBtn({ text: t('version_btn_failed'), show: true, disabled: false })
@@ -167,7 +167,7 @@ const VersionModal = ({ componentId }: { componentId: string }) => {
     if (versionInfo.isLatest || versionInfo.isUnknown) {
       void checkUpdate()
     } else if (versionInfo.status == 'downloaded') {
-      void updateApp()
+      void installUpdate()
     } else if (versionInfo.status == 'idle' || versionInfo.status == 'error') {
       downloadUpdate()
     }
@@ -176,7 +176,16 @@ const VersionModal = ({ componentId }: { componentId: string }) => {
   return (
     <ModalContent>
       <Content title={title} newVersionInfo={versionInfo.newVersion} />
-      { tip.length ? <Text style={styles.tip} color={theme['c-primary-font']}>{tip}</Text> : null }
+      { tip.length ? <Text selectable style={styles.tip} color={theme['c-primary-font']}>{tip}</Text> : null }
+      {versionInfo.status == 'error' && !versionInfo.isUnknown && versionInfo.newVersion ? (
+        <Button style={styles.releaseButton} onPress={() => {
+          void Linking.openURL(getReleasePageUrl(versionInfo.newVersion!.version)).catch(() => {
+            toast(t('version_tip_open_failed'))
+          })
+        }}>
+          <Text color={theme['c-primary-font']}>{t('version_btn_browser')}</Text>
+        </Button>
+      ) : null}
       <View style={styles.btns}>
         {
           ignoreBtn.show
@@ -246,6 +255,12 @@ const styles = createStyle({
     paddingBottom: 15,
     paddingLeft: 15,
     // paddingRight: 15,
+  },
+  releaseButton: {
+    alignSelf: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginBottom: 10,
   },
   btn: {
     flex: 1,

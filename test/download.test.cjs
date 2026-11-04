@@ -29,7 +29,7 @@ const selection = (info = song(), quality = '320k') => ({
   resolvedAt: Date.now(), musicId: info.id, source: info.source,
 })
 const tick = () => new Promise(resolve => setImmediate(resolve))
-const i18n = { t: key => key }
+const i18n = { t: (key, values) => values?.message ? `${key}: ${values.message}` : key }
 
 test('seven tiers, legacy Hi-Res and provider capability checks', () => {
   const rows = utils.getDownloadQualities(song(), ['128k', '320k', 'flac24bit'])
@@ -93,6 +93,7 @@ function resolverSetup(options = {}) {
   const api = load('src/core/music/downloadInfo.ts', {
     './utils': { async handleGetOnlineMusicUrl(args) {
       apiCalls.push(args)
+      if (options.apiError) throw new Error(options.apiError)
       return { quality: options.returnedQuality ?? args.quality, url: options.url ?? 'https://example.test/download' }
     } },
     '@/utils/download': utils,
@@ -125,6 +126,14 @@ test('unknown size and rejected HEAD do not prevent downloading', async() => {
     assert.equal(result.size, null)
     assert.equal(result.ext, 'mp3')
   }
+})
+
+test('provider token failures are distinguished from file downloads and preserve the original reason', async() => {
+  const setup = resolverSetup({ apiError: 'Backend aggregation failed: token server unavailable' })
+  await assert.rejects(setup.resolveDownloadSelection(song(), '320k'), /download_source_failed: .*token server unavailable/)
+  assert.equal(setup.apiCalls.length, 1)
+  assert.equal(setup.apiCalls[0].allowToggleSource, false)
+  assert.equal(setup.requests.length, 0)
 })
 
 test('unsupported tiers, downgraded responses and non-audio responses are rejected', async() => {
@@ -313,6 +322,21 @@ test('both list entry points use the shared mandatory quality dialog', () => {
   assert.match(source, /check=\{quality === item\.quality\}/)
   assert.match(source, /disabled=\{!item\.supported\}/)
   assert.match(source, /controller\.abort\(\)/)
+})
+
+test('pressing the selected quality does not discard the resolved download', () => {
+  const source = fs.readFileSync(path.join(root, 'src/components/MusicDownloadModal.tsx'), 'utf8')
+  const callback = source.match(/onChange=\{\(\) => \{([\s\S]*?)\n            \}\}/)[1]
+  const changes = []
+  const select = (quality, next) => vm.runInNewContext(`(() => {${callback}})()`, {
+    quality, item: { quality: next },
+    setSelection(value) { changes.push(['selection', value]) },
+    setQuality(value) { changes.push(['quality', value]) },
+  })
+  select('320k', '320k')
+  assert.deepEqual(changes, [])
+  select('320k', 'flac')
+  assert.deepEqual(changes, [['selection', null], ['quality', 'flac']])
 })
 
 test('all new labels exist in every locale and native scripts allow all seven tiers', () => {

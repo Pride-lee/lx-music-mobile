@@ -86,7 +86,11 @@ const Content = ({ musicInfo, onDownload, onHide }: Props & {
             disabled={!item.supported}
             need
             marginBottom={6}
-            onChange={() => { setSelection(null); setQuality(item.quality) }}
+            onChange={() => {
+              if (quality === item.quality) return
+              setSelection(null)
+              setQuality(item.quality)
+            }}
           >
             <View style={styles.option}>
               <Text color={item.supported ? theme['c-font'] : theme['c-500']}>{t(item.label)}</Text>

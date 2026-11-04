@@ -46,3 +46,11 @@ runs:
     - name: Test download options
       shell: bash
       run: npm run test:download
+
+    - name: Test media controls
+      shell: bash
+      run: npm run test:media-controls
+
+    - name: Test updater state and native integration
+      shell: bash
+      run: npm run test:updater

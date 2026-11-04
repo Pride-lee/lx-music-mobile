@@ -29,9 +29,16 @@ export const resolveDownloadSelection = async(musicInfo: LX.Music.MusicInfoOnlin
   if (signal?.aborted) throw new Error('cancelled')
   if (!global.lx.qualityList[musicInfo.source]?.includes(quality)) throw new Error(global.i18n.t('download_quality_unsupported'))
   // Downloads must keep the chosen source and quality, independent of playback fallback.
-  const result = await handleGetOnlineMusicUrl({
-    musicInfo, quality, isRefresh: true, allowToggleSource: false, onToggleSource: () => {},
-  })
+  let result: Awaited<ReturnType<typeof handleGetOnlineMusicUrl>>
+  try {
+    result = await handleGetOnlineMusicUrl({
+      musicInfo, quality, isRefresh: true, allowToggleSource: false, onToggleSource: () => {},
+    })
+  } catch (error) {
+    if (signal?.aborted) throw new Error('cancelled')
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(global.i18n.t('download_source_failed', { message }))
+  }
   if (signal?.aborted) throw new Error('cancelled')
   if (result.quality !== quality) throw new Error(global.i18n.t('download_quality_mismatch'))
   if (!/^https?:\/\//i.test(result.url)) throw new Error(global.i18n.t('download_failed'))
