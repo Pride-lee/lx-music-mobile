@@ -11,6 +11,8 @@ import { scaleSizeH, scaleSizeW, setSpText } from './pixelRatio'
 import { toOldMusicInfo } from './index'
 import { stringMd5 } from 'react-native-quick-md5'
 import { windowSizeTools } from '@/utils/windowSizeTools'
+import { formatDownloadName } from './download'
+import settingState from '@/store/setting/state'
 
 
 // https://stackoverflow.com/a/47349998
@@ -341,9 +343,8 @@ export const formatMusicName = (format: string, name: string, singer: string) =>
 
 export const shareMusic = (shareType: LX.ShareType, downloadFileName: LX.AppSetting['download.fileName'], musicInfo: LX.Music.MusicInfo) => {
   const name = musicInfo.name
-  const singer = musicInfo.singer
   const detailUrl = musicInfo.source == 'local' ? '' : musicSdk[musicInfo.source]?.getMusicDetailPageUrl(toOldMusicInfo(musicInfo)) ?? ''
-  const musicTitle = formatMusicName(downloadFileName, name, singer)
+  const musicTitle = formatDownloadName(downloadFileName, musicInfo, settingState.setting['download.quality'])
   switch (shareType) {
     case 'system':
       void shareText(global.i18n.t('share_card_title_music', { name }), global.i18n.t('share_title_music'), `${musicTitle.replace(/\s/g, '')}${detailUrl ? '\n' + detailUrl : ''}`)

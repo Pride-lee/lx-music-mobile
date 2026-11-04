@@ -5,7 +5,8 @@ import SubTitle from '../../components/SubTitle'
 import CheckBox from '@/components/common/CheckBox'
 import { useSettingValue } from '@/store/setting/hook'
 import { updateSetting } from '@/core/common'
-import { TRY_QUALITYS_LIST } from '@/core/music/utils'
+import { DOWNLOAD_QUALITIES } from '@/utils/download'
+import { useI18n } from '@/lang'
 
 const useActive = (id: LX.Quality) => {
   const q = useSettingValue('download.quality')
@@ -21,14 +22,12 @@ const Item = ({ id, name }: {
 }
 
 export default memo(() => {
-  const qualityList = useMemo(() => {
-    return [...TRY_QUALITYS_LIST, '128k'].reverse() as LX.Quality[]
-  }, [])
+  const t = useI18n()
 
   return (
-    <SubTitle title="下载音质">
+    <SubTitle title={t('download_default_quality')}>
       <View style={styles.list}>
-        {qualityList.map((q) => <Item name={q} id={q} key={q} />)}
+        {DOWNLOAD_QUALITIES.map((q) => <Item name={t(q.label)} id={q.id} key={q.id} />)}
       </View>
     </SubTitle>
   )

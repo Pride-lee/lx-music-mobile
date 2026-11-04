@@ -23,8 +23,8 @@ export const privateStorageDirectoryPath = Dirs.DocumentDir
 
 const MUSIC_DOWNLOAD_APP_FOLDER = 'lxmusic'
 
-export const getMusicDownloadDirectoryPath = (): string => {
-  const customPath = settingState.setting['download.savePath']?.trim()
+export const getMusicDownloadDirectoryPath = (savePath = settingState.setting['download.savePath']): string => {
+  const customPath = savePath?.trim()
   if (customPath) return customPath.replace(/\/+/g, '/')
   if (Platform.OS === 'android') {
     const root = (RNFS.DownloadDirectoryPath ?? '').replace(/\/+$/, '')
@@ -35,8 +35,8 @@ export const getMusicDownloadDirectoryPath = (): string => {
   return `${privateStorageDirectoryPath}/download/${MUSIC_DOWNLOAD_APP_FOLDER}`.replace(/\/+/g, '/')
 }
 
-export const ensureMusicDownloadDirectory = async(): Promise<string> => {
-  const dir = getMusicDownloadDirectoryPath()
+export const ensureMusicDownloadDirectory = async(savePath?: string): Promise<string> => {
+  const dir = getMusicDownloadDirectoryPath(savePath)
   if (!(await RNFS.exists(dir))) {
     await RNFS.mkdir(dir)
   }

@@ -2,16 +2,16 @@ import { memo } from 'react'
 
 import SavePath from './SavePath'
 import DownloadQuality from './DownloadQuality'
-import EmbedPic from './EmbedPic'
-import EmbedLyric from './EmbedLyric'
+import FileNameFormat from './FileNameFormat'
+import AdditionalOptions from './AdditionalOptions'
 
 export default memo(() => {
   return (
     <>
       <SavePath />
       <DownloadQuality />
-      <EmbedPic />
-      <EmbedLyric />
+      <FileNameFormat />
+      <AdditionalOptions />
     </>
   )
 })

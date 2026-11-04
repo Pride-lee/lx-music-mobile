@@ -350,7 +350,8 @@ declare global {
       /**
        * 文件命名方式
        */
-      'download.fileName': '歌名 - 歌手' | '歌手 - 歌名' | '歌名'
+      'download.fileName': string
+      'download.writeMetadata': boolean
       'download.savePath': string
       'download.quality': LX.Quality
       'download.isEmbedPic': boolean
