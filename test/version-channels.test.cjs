@@ -316,3 +316,8 @@ test('native package identity and provider are not hard-coded', () => {
   const constants = fs.readFileSync(path.join(__dirname, '../src/config/constant.ts'), 'utf8')
   assert.ok(constants.includes('APP_PROVIDER_NAME = `${APP_PACKAGE_NAME}.provider`'))
 })
+
+test('upstream version dispatch is disabled for fork releases', () => {
+  const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/publish-version-info.yml'), 'utf8')
+  assert.match(workflow, /^  dispatch:\s*\n(?:    #.*\r?\n)*    if: github\.repository == 'lyswhut\/lx-music-mobile'\s*$/m)
+})
