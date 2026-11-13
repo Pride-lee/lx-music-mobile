@@ -8,6 +8,7 @@ import ListMusicAdd, { type MusicAddModalType as ListMusicAddType } from '@/comp
 import MultipleModeBar, { type MultipleModeBarType, type SelectMode } from './MultipleModeBar'
 import { clearMusicUrl, handleDislikeMusic, handleDownload, handlePlay, handlePlayLater, handleShare, handleShowMusicSourceDetail } from './listAction'
 import { createStyle } from '@/utils/tools'
+import MusicDownloadModal, { type MusicDownloadModalType } from '@/components/MusicDownloadModal'
 
 export interface OnlineListProps {
   onRefresh: ListProps['onRefresh']
@@ -37,6 +38,7 @@ export default forwardRef<OnlineListType, OnlineListProps>(({
   const listMusicAddRef = useRef<ListMusicAddType>(null)
   const listMusicMultiAddRef = useRef<ListAddMultiType>(null)
   const listMenuRef = useRef<ListMenuType>(null)
+  const downloadModalRef = useRef<MusicDownloadModalType>(null)
   // const loadingMaskRef = useRef<LoadingMaskType>(null)
 
   useImperativeHandle(ref, () => ({
@@ -107,13 +109,14 @@ export default forwardRef<OnlineListType, OnlineListProps>(({
         ref={listMenuRef}
         onPlay={info => { handlePlay(info.musicInfo) }}
         onPlayLater={info => { hancelExitSelect(); handlePlayLater(info.musicInfo, info.selectedList, hancelExitSelect) }}
-        onDownload={info => { void handleDownload(info.musicInfo) }}
+        onDownload={info => { downloadModalRef.current?.show(info.musicInfo) }}
         onCopyName={info => { handleShare(info.musicInfo) }}
         onAdd={handleAddMusic}
         onMusicSourceDetail={info => { void handleShowMusicSourceDetail(info.musicInfo) }}
         onRemoveCache={info => { void clearMusicUrl(info.musicInfo) }}
         onDislikeMusic={info => { void handleDislikeMusic(info.musicInfo) }}
       />
+      <MusicDownloadModal ref={downloadModalRef} onDownload={(info, selection) => { void handleDownload(info, selection) }} />
       {/* <LoadingMask ref={loadingMaskRef} /> */}
     </View>
   )

@@ -114,6 +114,7 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+    // Keep the Java namespace stable across installed package identities.
     namespace "cn.toside.music.mobile"
     defaultConfig {
         applicationId releaseChannel.applicationId

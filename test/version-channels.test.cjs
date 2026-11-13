@@ -16,13 +16,19 @@ async function loadUpdater(applicationId, options = {}) {
   const installs = []
   const stoppedJobs = []
   const availabilityChecks = []
+  const removed = []
+  const pending = []
   const channel = Object.values(channels).find(item => item.applicationId === applicationId)
   const metadata = { version, desc: 'Release notes', history: [] }
   const release = {
     tag_name: `v${version}${channel?.releaseSuffix ?? ''}`,
     draft: false,
     prerelease: false,
-    assets: abis.map(abi => ({ name: `${repo}-v${version}-${abi}${channel?.releaseSuffix ?? ''}.apk` })),
+    assets: abis.map((abi, index) => ({
+      name: `${repo}-v${version}-${abi}${channel?.releaseSuffix ?? ''}.apk`,
+      id: index + 100, state: 'uploaded', size: 100,
+      ...(options.digest ? { digest: options.digest } : {}),
+    })),
     ...options.release,
   }
   let failedMetadata = false
@@ -54,17 +60,29 @@ async function loadUpdater(applicationId, options = {}) {
     '@/utils/fs': {
       temporaryDirectoryPath: '/cache',
       stopDownload(jobId) { stoppedJobs.push(jobId) },
+      async removeMusicDownloadTarget(file) { removed.push(file) },
+      async hash() { return options.actualDigest ?? 'a'.repeat(64) },
       downloadFile(url, savePath, config) {
-        downloads.push({ url, savePath })
-        config.begin({ statusCode: 200, contentLength: 100 })
+        const response = options.responses?.[downloads.length] ?? { statusCode: 200, bytesWritten: 100 }
+        downloads.push({ url, savePath, ...(config.headers ? { headers: config.headers } : {}) })
+        config.begin({
+          statusCode: response.statusCode, contentLength: options.contentLength ?? 100,
+          headers: options.headers ?? {},
+        })
         config.progress({ contentLength: 100, bytesWritten: 100 })
-        return { jobId: downloads.length, promise: Promise.resolve() }
+        const promise = options.pending
+          ? new Promise((resolve, reject) => pending.push({ resolve, reject }))
+          : response instanceof Error ? Promise.reject(response) : Promise.resolve(response)
+        return { jobId: downloads.length - 1, promise }
       },
     },
     '@/utils/nativeModules/utils': {
       APP_PACKAGE_NAME: applicationId,
       getSupportedAbis: async() => options.abis ?? ['arm64-v8a'],
-      installApk: async(filePath, provider) => { installs.push({ filePath, provider }) },
+      installApk: async(filePath, provider) => {
+        installs.push({ filePath, provider })
+        if (options.installError) throw new Error(options.installError)
+      },
     },
     '@/config/constant': { APP_PROVIDER_NAME: `${applicationId}.provider` },
   }
@@ -78,7 +96,7 @@ async function loadUpdater(applicationId, options = {}) {
     }, { context })
   })
   await updater.evaluate()
-  return { api: updater.namespace, requests, downloads, installs, stoppedJobs, availabilityChecks }
+  return { api: updater.namespace, requests, downloads, installs, stoppedJobs, availabilityChecks, removed, pending }
 }
 
 for (const [name, channel] of Object.entries(channels)) {
@@ -100,6 +118,8 @@ for (const [name, channel] of Object.entries(channels)) {
       const updater = await loadUpdater(channel.applicationId, { abis: abi === 'universal' ? ['unknown-abi'] : [abi] })
       const progress = []
       await updater.api.downloadNewVersion(version, (total, current) => progress.push([total, current]))
+      assert.equal(updater.installs.length, 0)
+      await updater.api.updateApp()
       assert.deepEqual(updater.downloads, [{
         url: `https://github.com/Pride-lee/${repo}/releases/download/v${version}${channel.releaseSuffix}/${repo}-v${version}-${abi}${channel.releaseSuffix}.apk`,
         savePath: `/cache/${channel.applicationId}-update.apk`,
@@ -108,7 +128,7 @@ for (const [name, channel] of Object.entries(channels)) {
         filePath: `/cache/${channel.applicationId}-update.apk`,
         provider: `${channel.applicationId}.provider`,
       }])
-      assert.deepEqual(progress, [[100, 0], [100, 100]])
+      assert.deepEqual(progress, [[0, 0], [100, 0], [100, 100]])
     })
   }
 }
@@ -196,12 +216,97 @@ test('unknown package identities fail closed without requesting or downloading',
   assert.deepEqual(updater.downloads, [])
 })
 
-test('a new download cancels the previous job without switching channel', async() => {
-  const updater = await loadUpdater(channels.luna.applicationId)
-  await updater.api.downloadNewVersion(version)
-  await updater.api.downloadNewVersion(version)
-  assert.deepEqual(updater.stoppedJobs, [1])
+test('repeated confirmation shares the active download without competing writers', async() => {
+  const updater = await loadUpdater(channels.luna.applicationId, { pending: true })
+  const first = updater.api.downloadNewVersion(version)
+  const second = updater.api.downloadNewVersion(version)
+  assert.equal(first, second)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(updater.pending.length, 1)
+  updater.pending[0].resolve({ statusCode: 200, bytesWritten: 100 })
+  await Promise.all([first, second])
+  assert.deepEqual(updater.stoppedJobs, [])
+  assert.equal(updater.downloads.length, 1)
   assert.ok(updater.downloads.every(download => download.url.includes(channels.luna.releaseSuffix)))
+})
+
+test('network and HTTP failures retry without changing package channel', async() => {
+  const updater = await loadUpdater(channels.kuwo.applicationId, {
+    responses: [new Error('Network unavailable'), { statusCode: 503, bytesWritten: 0 }],
+  })
+  await updater.api.downloadNewVersion(version)
+  assert.equal(updater.downloads.length, 3)
+  assert.equal(updater.downloads[0].url, updater.downloads[1].url)
+  assert.match(updater.downloads[2].url, /api\.github\.com\/repos\/Pride-lee\/lx-music-mobile\/releases\/assets\/100$/)
+  assert.equal(updater.downloads[2].headers.Accept, 'application/octet-stream')
+  assert.equal(updater.installs.length, 0)
+  assert.ok(updater.requests.every(url => url.endsWith('-xiaomi-kuwo')))
+})
+
+test('missing fallback assets cannot select another channel', async() => {
+  const updater = await loadUpdater(channels.luna.applicationId, {
+    responses: [new Error('Network unavailable'), new Error('Network unavailable')],
+    release: { assets: [{ id: 999, state: 'uploaded', name: `${repo}-v${version}-arm64-v8a-xiaomi-kuwo.apk` }] },
+  })
+  await assert.rejects(updater.api.downloadNewVersion(version), /Network unavailable/)
+  assert.equal(updater.downloads.length, 2)
+  await assert.rejects(updater.api.updateApp(), /apk Save Path/)
+})
+
+test('non-200, empty, truncated and HTML downloads never become installable', async() => {
+  for (const options of [
+    { responses: Array(3).fill({ statusCode: 404, bytesWritten: 0 }) },
+    { responses: Array(3).fill({ statusCode: 200, bytesWritten: 0 }) },
+    { responses: Array(3).fill({ statusCode: 200, bytesWritten: 90 }) },
+    { headers: { 'Content-Type': 'text/html' } },
+    { headers: { 'Content-Type': 'application/json' } },
+  ]) {
+    const updater = await loadUpdater(channels.luna.applicationId, options)
+    await assert.rejects(updater.api.downloadNewVersion(version))
+    await assert.rejects(updater.api.updateApp(), /apk Save Path/)
+    assert.equal(updater.installs.length, 0)
+    assert.equal(updater.removed.length, 6)
+  }
+})
+
+test('release asset size and SHA256 are checked when provided by GitHub', async() => {
+  const good = await loadUpdater(channels.luna.applicationId, { digest: `sha256:${'a'.repeat(64)}` })
+  await good.api.getVersionInfo()
+  await good.api.downloadNewVersion(version)
+  await good.api.updateApp()
+  assert.equal(good.installs.length, 1)
+  const bad = await loadUpdater(channels.luna.applicationId, {
+    digest: `sha256:${'b'.repeat(64)}`, contentLength: -1,
+  })
+  await bad.api.getVersionInfo()
+  await assert.rejects(bad.api.downloadNewVersion(version), /checksum mismatch/)
+  await assert.rejects(bad.api.updateApp(), /apk Save Path/)
+})
+
+test('installation errors preserve the completed APK for retry without downloading again', async() => {
+  const updater = await loadUpdater(channels.kuwo.applicationId, { installError: 'INSTALL_PERMISSION_REQUIRED' })
+  await updater.api.downloadNewVersion(version)
+  await assert.rejects(updater.api.updateApp(), /INSTALL_PERMISSION_REQUIRED/)
+  await assert.rejects(updater.api.updateApp(), /INSTALL_PERMISSION_REQUIRED/)
+  assert.equal(updater.downloads.length, 1)
+  assert.equal(updater.installs.length, 2)
+})
+
+test('browser fallback uses the installed package release, never latest across channels', async() => {
+  for (const channel of Object.values(channels)) {
+    const updater = await loadUpdater(channel.applicationId)
+    assert.equal(updater.api.getReleasePageUrl(version),
+      `https://github.com/Pride-lee/${repo}/releases/tag/v${version}${channel.releaseSuffix}`)
+  }
+})
+
+test('a failed subsequent download cannot install a stale APK', async() => {
+  const updater = await loadUpdater(channels.luna.applicationId, {
+    responses: [{ statusCode: 200, bytesWritten: 100 }, ...Array(3).fill(new Error('Offline'))],
+  })
+  await updater.api.downloadNewVersion(version)
+  await assert.rejects(updater.api.downloadNewVersion(version), /Offline/)
+  await assert.rejects(updater.api.updateApp(), /apk Save Path/)
 })
 
 test('native package identity and provider are not hard-coded', () => {
@@ -210,4 +315,9 @@ test('native package identity and provider are not hard-coded', () => {
   assert.match(native, /!reactContext\.getPackageName\(\)\.equals\(updatePackage\.packageName\)/)
   const constants = fs.readFileSync(path.join(__dirname, '../src/config/constant.ts'), 'utf8')
   assert.ok(constants.includes('APP_PROVIDER_NAME = `${APP_PACKAGE_NAME}.provider`'))
+})
+
+test('upstream version dispatch is disabled for fork releases', () => {
+  const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/publish-version-info.yml'), 'utf8')
+  assert.match(workflow, /^  dispatch:\s*\n(?:    #.*\r?\n)*    if: github\.repository == 'lyswhut\/lx-music-mobile'\s*$/m)
 })

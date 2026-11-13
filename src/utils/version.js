@@ -1,6 +1,6 @@
 import { checkUrl, httpGet } from '@/utils/request'
 import { name } from '../../package.json'
-import { downloadFile, stopDownload, temporaryDirectoryPath } from '@/utils/fs'
+import { downloadFile, hash, removeMusicDownloadTarget, temporaryDirectoryPath } from '@/utils/fs'
 import { APP_PACKAGE_NAME, getSupportedAbis, installApk } from '@/utils/nativeModules/utils'
 import { APP_PROVIDER_NAME } from '@/config/constant'
 import releaseChannels from '../../release-channels.json'
@@ -8,6 +8,7 @@ import releaseChannels from '../../release-channels.json'
 // fork：检查更新只看自己的仓库；GitHub 仓库 slug 仍保持 package.json 的 name（lx-music-mobile）
 const FORK_OWNER = 'Pride-lee'
 const FORK_REPO = name
+const releaseAssets = new Map()
 
 const getUpdateChannel = () => {
   const channel = Object.values(releaseChannels).find(channel => channel.applicationId == APP_PACKAGE_NAME)
@@ -17,6 +18,20 @@ const getUpdateChannel = () => {
 
 const getApkDownloadUrl = (version, abi, releaseSuffix) => {
   return `https://github.com/${FORK_OWNER}/${FORK_REPO}/releases/download/v${version}${releaseSuffix}/${FORK_REPO}-v${version}-${abi}${releaseSuffix}.apk`
+}
+
+export const getReleasePageUrl = (version) => {
+  const { releaseSuffix } = getUpdateChannel()
+  return `https://github.com/${FORK_OWNER}/${FORK_REPO}/releases/tag/v${encodeURIComponent(version + releaseSuffix)}`
+}
+
+const getRelease = async(version, releaseSuffix) => {
+  const tag = `v${version}${releaseSuffix}`
+  const release = await request(`https://api.github.com/repos/${FORK_OWNER}/${FORK_REPO}/releases/tags/${encodeURIComponent(tag)}`)
+  if (release.tag_name != tag || release.draft || release.prerelease || !Array.isArray(release.assets)) {
+    throw new Error('Update channel release is unavailable')
+  }
+  return release
 }
 
 const abis = [
@@ -65,7 +80,7 @@ const getDirectInfo = async(url) => {
     const tag = `v${info.version}${releaseSuffix}`
     let release
     try {
-      release = await request(`https://api.github.com/repos/${FORK_OWNER}/${FORK_REPO}/releases/tags/${encodeURIComponent(tag)}`)
+      release = await getRelease(info.version, releaseSuffix)
     } catch (error) {
       if (error.statusCode != 403 && error.statusCode != 429) throw error
       // Shared proxy IPs can exhaust the unauthenticated GitHub API quota.
@@ -77,6 +92,7 @@ const getDirectInfo = async(url) => {
     if (!abis.every(abi => release.assets.some(asset => asset.name == `${FORK_REPO}-v${info.version}-${abi}${releaseSuffix}.apk`))) {
       throw new Error('Update channel APKs are unavailable')
     }
+    releaseAssets.set(tag, release.assets)
   }
   return info
 }
@@ -117,42 +133,81 @@ const getTargetAbi = async() => {
   }
   return abis[abis.length - 1]
 }
-let downloadJobId = null
 const noop = (total, download) => {}
 let apkSavePath
+let downloadTask = null
 
-export const downloadNewVersion = async(version, onDownload = noop) => {
+const runDownload = async(version, onDownload) => {
+  if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version)) throw new Error('Invalid update version')
   const { releaseSuffix } = getUpdateChannel()
   const abi = await getTargetAbi()
   const url = getApkDownloadUrl(version, abi, releaseSuffix)
-  let savePath = `${temporaryDirectoryPath}/${APP_PACKAGE_NAME}-update.apk`
+  const savePath = `${temporaryDirectoryPath}/${APP_PACKAGE_NAME}-update.apk`
+  const tag = `v${version}${releaseSuffix}`
+  const assetName = `${FORK_REPO}-v${version}-${abi}${releaseSuffix}.apk`
+  let asset = releaseAssets.get(tag)?.find(item => item.name == assetName)
+  let lastError
+  apkSavePath = null
 
-  if (downloadJobId) stopDownload(downloadJobId)
+  // Retry the release URL, then try GitHub's official asset endpoint only.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let downloadUrl = url
+    let headers
+    if (attempt == 2) {
+      try {
+        const release = await getRelease(version, releaseSuffix)
+        asset = release.assets.find(item => item.name == assetName && item.state == 'uploaded')
+        if (!Number.isSafeInteger(asset?.id) || asset.id <= 0) throw new Error('Update channel APK is unavailable')
+        downloadUrl = `https://api.github.com/repos/${FORK_OWNER}/${FORK_REPO}/releases/assets/${asset.id}`
+        headers = { Accept: 'application/octet-stream', 'User-Agent': FORK_REPO }
+      } catch {
+        break
+      }
+    }
+    await removeMusicDownloadTarget(savePath)
+    onDownload(0, 0)
+    let contentLength = 0
+    let contentType = ''
+    try {
+      const { promise } = downloadFile(downloadUrl, savePath, {
+        progressInterval: 500,
+        connectionTimeout: 30000,
+        readTimeout: 60000,
+        ...(headers ? { headers } : {}),
+        begin(info) {
+          contentLength = info.contentLength > 0 ? info.contentLength : 0
+          contentType = String(Object.entries(info.headers ?? {}).find(([key]) => key.toLowerCase() == 'content-type')?.[1] ?? '')
+          onDownload(contentLength, 0)
+        },
+        progress({ contentLength, bytesWritten }) {
+          onDownload(contentLength > 0 ? contentLength : 0, bytesWritten)
+        },
+      })
+      const result = await promise
+      if (result.statusCode != 200) throw new Error(`HTTP ${result.statusCode}`)
+      if (/^(?:text\/|application\/(?:json|xml))/i.test(contentType)) throw new Error('Invalid APK response')
+      if (!(result.bytesWritten > 0) || (contentLength > 0 && result.bytesWritten != contentLength) ||
+        (asset?.size > 0 && result.bytesWritten != asset.size)) throw new Error('Incomplete APK download')
+      if (/^sha256:[a-f0-9]{64}$/i.test(asset?.digest ?? '')) {
+        const actual = await hash(savePath, 'sha256')
+        if (actual.toLowerCase() != asset.digest.slice(7).toLowerCase()) throw new Error('APK checksum mismatch')
+      }
+      apkSavePath = savePath
+      return
+    } catch (error) {
+      lastError = error
+      await removeMusicDownloadTarget(savePath).catch(() => {})
+    }
+  }
+  throw lastError ?? new Error('Update download failed')
+}
 
-  const { jobId, promise } = downloadFile(url, savePath, {
-    progressInterval: 500,
-    connectionTimeout: 20000,
-    readTimeout: 30000,
-    begin({ statusCode, contentLength }) {
-      onDownload(contentLength, 0)
-      // switch (statusCode) {
-      //   case 200:
-      //   case 206:
-      //     break
-      //   default:
-      //     onDownload(null, contentLength, 0)
-      //     break
-      // }
-    },
-    progress({ contentLength, bytesWritten }) {
-      onDownload(contentLength, bytesWritten)
-    },
-  })
-  downloadJobId = jobId
-  return promise.then(() => {
-    apkSavePath = savePath
-    return updateApp()
-  })
+export const downloadNewVersion = (version, onDownload = noop) => {
+  // Reopening the modal must not start two writers for the same APK.
+  if (!downloadTask) {
+    downloadTask = runDownload(version, onDownload).finally(() => { downloadTask = null })
+  }
+  return downloadTask
 }
 
 export const updateApp = async() => {

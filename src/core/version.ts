@@ -1,5 +1,5 @@
 import { compareVer } from '@/utils'
-import { downloadNewVersion, getVersionInfo } from '@/utils/version'
+import { downloadNewVersion, getVersionInfo, updateApp } from '@/utils/version'
 import versionActions from '@/store/version/action'
 import versionState, { type InitState } from '@/store/version/state'
 import { getIgnoreVersion, getIgnoreVersionFailTipTime, saveIgnoreVersion, saveIgnoreVersionFailTipTime } from '@/utils/data'
@@ -20,7 +20,7 @@ export const hideModal = (componentId: string) => {
 }
 
 export const checkUpdate = async() => {
-  versionActions.setVersionInfo({ status: 'checking' })
+  versionActions.setVersionInfo({ status: 'checking', errorMessage: '' })
   let versionInfo: InitState['versionInfo'] = { ...versionState.versionInfo }
   try {
     const { version, desc, history } = await getVersionInfo()
@@ -47,9 +47,7 @@ export const checkUpdate = async() => {
   } else {
     versionInfo.status = 'idle'
     versionInfo.isUnknown = false
-    if (compareVer(versionInfo.version, versionInfo.newVersion.version) != -1) {
-      versionInfo.isLatest = true
-    }
+    versionInfo.isLatest = compareVer(versionInfo.version, versionInfo.newVersion.version) != -1
   }
 
   versionActions.setVersionInfo(versionInfo)
@@ -68,18 +66,37 @@ export const checkUpdate = async() => {
   // console.log(process.versions.app, versionInfo.version)
 }
 
+const getErrorMessage = (error: unknown) => {
+  return error instanceof Error ? error.message : String(error)
+}
+
+export const installUpdate = async() => {
+  versionActions.setVersionInfo({ errorMessage: '' })
+  try {
+    await updateApp()
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code
+    const invalidApk = code == 'APK_INVALID' || code == 'APK_MISSING' || code == 'APK_PACKAGE_MISMATCH'
+    versionActions.setVersionInfo({
+      status: invalidApk ? 'error' : 'downloaded',
+      errorMessage: getErrorMessage(error),
+    })
+  }
+}
+
 export const downloadUpdate = () => {
-  versionActions.setVersionInfo({ status: 'downloading' })
+  if (versionState.versionInfo.status == 'downloading') return
+  versionActions.setVersionInfo({ status: 'downloading', errorMessage: '' })
   versionActions.setProgress({ total: 0, current: 0 })
 
   downloadNewVersion(versionState.versionInfo.newVersion!.version, (total: number, current: number) => {
     // console.log(total, current)
     versionActions.setProgress({ total, current })
-  }).then(() => {
+  }).then(async() => {
     versionActions.setVersionInfo({ status: 'downloaded' })
-  }).catch(() => {
-    versionActions.setVersionInfo({ status: 'error' })
-    // console.log(err)
+    await installUpdate()
+  }).catch((error: unknown) => {
+    versionActions.setVersionInfo({ status: 'error', errorMessage: getErrorMessage(error) })
   })
 }
 

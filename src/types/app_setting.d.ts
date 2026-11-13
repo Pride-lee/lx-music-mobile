@@ -200,6 +200,7 @@ declare global {
        * 是否启用蓝牙完整歌词
        */
       'player.isShowBluetoothFullLyric': boolean
+      'player.isShowCarwithLyric': boolean
 
       /**
        * 播放详情页-是否缩放当前播放的歌词行
@@ -349,7 +350,8 @@ declare global {
       /**
        * 文件命名方式
        */
-      'download.fileName': '歌名 - 歌手' | '歌手 - 歌名' | '歌名'
+      'download.fileName': string
+      'download.writeMetadata': boolean
       'download.savePath': string
       'download.quality': LX.Quality
       'download.isEmbedPic': boolean

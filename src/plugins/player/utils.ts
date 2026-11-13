@@ -173,6 +173,8 @@ export interface NowPlayingTitles {
   artist?: string
   album?: string
   lyric?: string
+  ucarLyricLine?: string
+  ucarLyricWhole?: string
 }
 export const updateNowPlayingTitles = async(titles: NowPlayingTitles) => {
   // console.log('set playing titles', titles)
@@ -274,9 +276,9 @@ export const updateOptions = async(options = {
 
   // // An array of capabilities that will show up when the notification is in the compact form on Android
   compactCapabilities: [
+    Capability.SkipToPrevious,
     Capability.Play,
     Capability.Pause,
-    Capability.Stop,
     Capability.SkipToNext,
   ],
 

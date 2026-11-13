@@ -34,6 +34,7 @@ const defaultSetting: LX.AppSetting = {
   'player.isS2t': false,
   'player.isShowBluetoothLyric': false,
   'player.isShowBluetoothFullLyric': false,
+  'player.isShowCarwithLyric': false,
 
   // 'playDetail.isZoomActiveLrc': false,
   // 'playDetail.isShowLyricProgressSetting': false,
@@ -69,6 +70,7 @@ const defaultSetting: LX.AppSetting = {
   'list.addMusicLocationType': 'top',
 
   'download.fileName': '歌名 - 歌手',
+  'download.writeMetadata': true,
   'download.savePath': '',
   'download.quality': '320k',
   'download.isEmbedPic': false,

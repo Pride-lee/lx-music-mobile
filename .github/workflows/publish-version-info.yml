@@ -7,6 +7,8 @@ on:
 
 jobs:
   dispatch:
+    # Fork releases use their own update channels, not the upstream NPM registry.
+    if: github.repository == 'lyswhut/lx-music-mobile'
     runs-on: ubuntu-latest
     steps:
       - name: Repository Dispatch

@@ -8,6 +8,11 @@ on:
     branches:
       - xiaomi
   workflow_dispatch:
+    inputs:
+      draft:
+        description: Create draft releases for device verification before publishing
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -123,6 +128,12 @@ jobs:
           cat > release-notes.md <<EOF
           # LHX Music v${PACKAGE_VERSION} (小米后屏版 / ${{ matrix.label }})
 
+          - 修复重复选择当前下载音质后下载按钮不可用的问题，明确显示音源解析失败的原始原因
+          - 更新包下载增加重试、官方接口备用路径和完整性检查；修复原生重定向超时配置丢失
+          - 区分下载与安装失败，安装权限未开启时引导授权，重试安装无需重复下载
+          - 补齐标准媒体按键处理，小窗快捷控制提供上一首、播放/暂停、下一首
+          - 保留七档音质、自定义命名、标签、封面和歌词下载选项
+          - 保留 CarWith / Jovi InCar 歌词开关，车载兼容性以设备实测为准
           - 安装包名：\`${{ env.APPLICATION_ID }}\`
           - 独立更新通道：\`${{ env.RELEASE_SUFFIX }}\`，安装后只检查和下载本包名的 release
           - 汽水包名与酷我包名两个版本会同时保留，可分别安装，数据相互独立
@@ -143,7 +154,7 @@ jobs:
         with:
           body_path: ./release-notes.md
           prerelease: false
-          draft: false
+          draft: ${{ inputs.draft == true || contains(github.event.head_commit.message, '[verify-first]') }}
           tag_name: v${{ env.PACKAGE_VERSION }}${{ env.RELEASE_SUFFIX }}
           target_commitish: ${{ github.sha }}
           name: LHX Music v${{ env.PACKAGE_VERSION }} (小米后屏版 / ${{ matrix.label }})
