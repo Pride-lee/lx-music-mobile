@@ -321,3 +321,15 @@ test('upstream version dispatch is disabled for fork releases', () => {
   const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/publish-version-info.yml'), 'utf8')
   assert.match(workflow, /^  dispatch:\s*\n(?:    #.*\r?\n)*    if: github\.repository == 'lyswhut\/lx-music-mobile'\s*$/m)
 })
+
+test('standard release keeps its explicit identity and existing signing configuration', () => {
+  const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/release.yml'), 'utf8')
+  assert.match(workflow, /assembleRelease -PlxReleaseChannel=standard/)
+  assert.match(workflow, /release-channel\.cjs verify standard/)
+  for (const key of ['STORE_FILE_BASE64', 'STORE_FILE', 'KEY_ALIAS', 'PASSWORD', 'KEY_PASSWORD']) {
+    assert.ok(workflow.includes(`secrets.MASTER_KEYSTORE_${key} || secrets.KEYSTORE_${key}`))
+  }
+  assert.match(workflow, /draft: \$\{\{ inputs\.draft == true \}\}/)
+  assert.match(workflow, /target_commitish: \$\{\{ github\.sha \}\}/)
+  assert.match(workflow, /fail_on_unmatched_files: true/)
+})

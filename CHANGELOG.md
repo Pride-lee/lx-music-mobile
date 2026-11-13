@@ -6,6 +6,15 @@ Project versioning adheres to [Semantic Versioning](http://semver.org/).
 Commit convention is based on [Conventional Commits](http://conventionalcommits.org).
 Change log format is based on [Keep a Changelog](http://keepachangelog.com/).
 
+## [1.9.5](https://github.com/Pride-lee/lx-music-mobile/compare/v1.9.2...v1.9.5) - 2026-11-13
+
+### 标准版
+
+- 同步七档下载音质、文件命名、标签、封面与歌词选项。
+- 同步 CarWith / Jovi InCar 歌词开关、媒体按键及应用更新修复。
+- 合入上游 1.9.2 的酷狗歌单修复和默认禁用音频卸载调整。
+- 保留标准版包名、签名配置和 master 更新通道；已有汽水、酷我版本不变。
+
 ## [1.9.3](https://github.com/Pride-lee/lx-music-mobile/compare/v1.9.2-xiaomi-kuwo...v1.9.3-xiaomi-kuwo) - 2026-10-27
 
 ### 新增
@@ -33,6 +42,16 @@ Change log format is based on [Keep a Changelog](http://keepachangelog.com/).
 ### 升级说明
 
 - 从旧版升级时，首次请手动下载对应包名的 v1.9.2 覆盖安装；之后自动保持当前通道。
+## [上游 1.9.2](https://github.com/lyswhut/lx-music-mobile/compare/v1.9.1...v1.9.2) - 2026-10-30
+
+### 修复
+
+- 修复无法打开 kg 歌单的问题
+- 修复打开某些 kg 歌单时歌曲丢失的问题
+
+### 变更
+
+- 默认禁用音频卸载
 
 ## [1.9.1](https://github.com/lyswhut/lx-music-mobile/compare/v1.9.0...v1.9.1) - 2026-09-19
 

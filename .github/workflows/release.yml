@@ -5,6 +5,11 @@ on:
     branches:
       - master
   workflow_dispatch:
+    inputs:
+      draft:
+        description: Create a draft for package and signing verification
+        type: boolean
+        default: false
 
 # 给 GITHUB_TOKEN 显式开通需要的写权限，避免 fork 默认 read-only 导致创建 tag / 发 release 时 403
 permissions:
@@ -201,8 +206,10 @@ jobs:
         with:
           body_path: ./publish/changeLog.md
           prerelease: false
-          draft: false
+          draft: ${{ inputs.draft == true }}
           tag_name: v${{ env.PACKAGE_VERSION }}
+          target_commitish: ${{ github.sha }}
+          fail_on_unmatched_files: true
           files: |
             artifacts/lx-music-mobile-v${{ env.PACKAGE_VERSION }}-arm64-v8a.apk
             artifacts/lx-music-mobile-v${{ env.PACKAGE_VERSION }}-armeabi-v7a.apk
